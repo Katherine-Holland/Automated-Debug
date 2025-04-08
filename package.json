@@ -1,0 +1,26 @@
+{
+  "name": "automated-debug",
+  "version": "1.0.0",
+  "description": "Uh oh! You have a web application that displays real-time data from multiple sources. Sometimes, the data fails to update correctly, or there are discrepancies in the values.  Let's automate the detection of these issues, capture them with screenshots, and provide a summary of what might be causing the problem... lets throw in some Ai too ;",
+  "main": "playwright.config.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Katherine-Holland/Automated-Debug.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Katherine-Holland/Automated-Debug/issues"
+  },
+  "homepage": "https://github.com/Katherine-Holland/Automated-Debug#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.51.1"
+  }
+}
