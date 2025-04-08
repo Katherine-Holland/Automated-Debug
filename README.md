@@ -1,6 +1,7 @@
 # Automated-Debug
-Uh oh! You have a web application that displays real-time data from multiple sources. Sometimes, the data fails to update correctly, or there are discrepancies in the values. 
-Let's automate the detection of these issues, capture them with screenshots, and provide a summary of what might be causing the problem... lets throw in some Ai too ;
+
+Uh oh! You have a web application that displays real-time data from multiple sources. Sometimes, the data fails to update correctly, or there are discrepancies in the values.  
+Let's automate the detection of these issues, capture them with screenshots, and provide a summary of what might be causing the problem... lets throw in some Ai too 😉
 
 This project uses [Microsoft Playwright](https://playwright.dev/) to automatically check the **Hacker News** homepage for potential headline issues. If a bug is detected (like a short or missing headline), a screenshot is captured automatically for debugging.
 
@@ -70,3 +71,57 @@ npx playwright show-trace test-results/<your-trace-file>.zip
 
 ---
 
+## 🤖 AI-Powered Bug Prediction
+
+We've trained a TensorFlow model to predict bugs before they even happen!
+
+This model takes three real-time features:
+- `headlineLength`
+- `loadTimeMs`
+- `missingElements`
+
+And estimates the likelihood of a bug occurring. If the prediction is **below a certain threshold**, the test will automatically **skip** to save time and resources.
+
+### 🧠 How It Works
+1. A Python script (`predictor_bridge.py`) loads the trained AI model.
+2. It accepts input from the Playwright test (e.g., `18 1600 2`) and returns a prediction score.
+3. If the predicted likelihood is high (e.g., > 0.5), the test proceeds and validates the page.
+4. If the likelihood is low, the test logs it and skips!
+
+### Example Output:
+
+```bash
+🔍 Raw prediction output: 0.6215
+🤖 AI Prediction: Bug Likelihood = 0.62
+✅ AI predicts no bug — skipping test.
+```
+
+> You can adjust the threshold logic in `bugChecker.spec.js` to suit your use case.
+
+---
+
+## 📁 Additional Files
+
+```
+.
+├── bug_predictor_model.keras      # Trained AI model (TensorFlow)
+├── bug_scaler.save                # Scaler for input normalization
+├── predictor_bridge.py            # Python bridge script for predictions
+├── train_bug_predictor.py         # Train your own model on synthetic data
+├── synthetic_bug_data.csv         # Dataset used for model training
+```
+
+---
+
+## 🧠 Training Your Own AI Model
+
+Want to re-train the bug predictor? Run:
+
+```bash
+python train_bug_predictor.py
+```
+
+This will:
+- Load `synthetic_bug_data.csv`
+- Train a neural network
+- Save the model and scaler
