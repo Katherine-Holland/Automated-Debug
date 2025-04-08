@@ -125,3 +125,25 @@ This will:
 - Load `synthetic_bug_data.csv`
 - Train a neural network
 - Save the model and scaler
+
+---
+
+## 📊 AI Bug Detection Insights
+
+Our Playwright test now uses a trained TensorFlow model to predict the likelihood of bugs. Each run logs:
+
+- Headline length
+- Load time
+- Missing elements
+- Predicted bug likelihood
+
+### 📈 Charts from Prediction Logs
+
+#### Bug Likelihood Over Time
+![Bug Likelihood Over Time](./charts/bug_likelihood_over_time.png)
+
+#### Page Load Time Distribution
+![Load Time Distribution](./charts/load_time_distribution.png)
+
+#### Test Outcome Summary
+![Test Outcome Summary](./charts/test_outcomes.png)
