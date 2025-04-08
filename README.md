@@ -1,3 +1,4 @@
+
 # Automated-Debug
 
 Uh oh! You have a web application that displays real-time data from multiple sources. Sometimes, the data fails to update correctly, or there are discrepancies in the values.  
@@ -147,3 +148,43 @@ Our Playwright test now uses a trained TensorFlow model to predict the likelihoo
 
 #### Test Outcome Summary
 ![Test Outcome Summary](./charts/test_outcomes.png)
+
+---
+
+## 🧰 Python Setup (for AI and Dashboard)
+
+If you're using the AI predictor or dashboard features, you’ll need Python with a few libraries installed.
+
+### Install required Python packages:
+
+```bash
+pip install -r requirements.txt
+```
+
+Your `requirements.txt` should contain:
+
+```
+streamlit
+matplotlib
+pandas
+```
+
+---
+
+## 🌐 Live AI Dashboard with Streamlit
+
+We’ve built a real-time dashboard using [Streamlit](https://streamlit.io/) to visualize bug prediction trends and test logs.
+
+### ▶️ To run it locally:
+
+```bash
+streamlit run streamlit_dashboard.py
+```
+
+Then open the local link it provides (usually `http://localhost:8501`) in your browser.
+
+### 📋 Features:
+- 📈 Bug likelihood over time
+- ⏱️ Load time distribution
+- 📊 Test outcome summary
+- 📂 Upload new `prediction-log.json` to refresh charts in real time
