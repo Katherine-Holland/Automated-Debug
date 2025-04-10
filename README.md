@@ -1,4 +1,3 @@
-
 # Automated-Debug
 
 Uh oh! You have a web application that displays real-time data from multiple sources. Sometimes, the data fails to update correctly, or there are discrepancies in the values.  
@@ -167,6 +166,9 @@ Your `requirements.txt` should contain:
 streamlit
 matplotlib
 pandas
+tensorflow
+scikit-learn
+playwright
 ```
 
 ---
@@ -175,10 +177,10 @@ pandas
 
 We’ve built a real-time dashboard using [Streamlit](https://streamlit.io/) to visualize bug prediction trends and test logs.
 
-### ▶️ To run it locally:
+Launch it like this:
 
 ```bash
-streamlit run streamlit_dashboard.py
+streamlit run bugfinder_app.py
 ```
 
 Then open the local link it provides (usually `http://localhost:8501`) in your browser.
@@ -188,3 +190,17 @@ Then open the local link it provides (usually `http://localhost:8501`) in your b
 - ⏱️ Load time distribution
 - 📊 Test outcome summary
 - 📂 Upload new `prediction-log.json` to refresh charts in real time
+- 🌐 Enter a website URL to test for bugs using AI prediction
+
+## 🧠 Run the BugFinder App (Streamlit UI)
+
+Launch the visual interface to test any website URL:
+
+```bash
+streamlit run bugfinder_app.py
+```
+
+Enter a URL and view:
+- ✅ Bug prediction score
+- 📸 Screenshot of the issue (via Playwright)
+- 📄 JSON report log for download

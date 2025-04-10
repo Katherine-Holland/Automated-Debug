@@ -1,50 +1,99 @@
 import streamlit as st
-import subprocess
+import pandas as pd
+import matplotlib.pyplot as plt
 import json
-import base64
-from pathlib import Path
-from PIL import Image
+import os
+import subprocess
+from datetime import datetime
 
-st.set_page_config(page_title="BugFinder AI", layout="centered")
+st.set_page_config(page_title="AI Bug Finder", layout="wide")
+st.title("🕷️ AI-Powered Bug Finder Dashboard")
 
-st.title("🕷️ BugFinder AI – Automated Bug Scanner")
-st.markdown("Enter a website URL to scan for potential issues using Playwright and AI.")
+log_file_path = "prediction-log.json"
+PREDICTION_LOG_PATH = "prediction-log.json"
 
-url = st.text_input("🔗 Enter Website URL", "https://news.ycombinator.com")
-run_button = st.button("🚀 Scan Site")
+def load_logs(file_path):
+    if os.path.exists(file_path):
+        with open(file_path, "r") as f:
+            return pd.DataFrame(json.load(f))
+    return pd.DataFrame()
 
-if run_button:
-    with st.spinner("Running bug checks..."):
-        # 1. Run Playwright test with dynamic URL
-        result = subprocess.run(
-            ["npx", "playwright", "test", f"tests/bugChecker.spec.js", f'--project=chromium', f'--grep=^{url}$'],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True
-        )
+def log_prediction(entry):
+    if os.path.exists(log_file_path):
+        with open(log_file_path, "r") as f:
+            data = json.load(f)
+    else:
+        data = []
+    data.append(entry)
+    with open(log_file_path, "w") as f:
+        json.dump(data, f, indent=2)
 
-        st.code(result.stdout, language="bash")
+tabs = st.tabs(["📊 Dashboard", "📁 Upload Logs", "🌐 Live Website Test"])
 
-        # 2. Load prediction-log.json
-        log_path = Path("prediction-log.json")
-        if log_path.exists():
-            logs = json.loads(log_path.read_text())
-            latest = logs[-1]
+with tabs[0]:
+    st.header("📈 Bug Detection Insights")
+    df = load_logs(log_file_path)
 
-            st.subheader("🧠 AI Prediction Results")
-            st.metric("Bug Likelihood", f"{latest['prediction']:.2f}")
-            st.json(latest)
+    if df.empty:
+        st.info("No prediction logs found. Please upload a file in the next tab.")
+    else:
+        df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce", format="ISO8601")
+        col1, col2 = st.columns(2)
 
-            # 3. Show Screenshot
-            screenshot = Path("error-screenshot.png")
-            if screenshot.exists():
-                st.image(Image.open(screenshot), caption="Bug Screenshot")
+        with col1:
+            st.subheader("Bug Likelihood Over Time")
+            plt.figure()
+            plt.plot(df["timestamp"], df["prediction"], marker="o")
+            plt.xticks(rotation=45)
+            plt.ylabel("Bug Likelihood")
+            plt.tight_layout()
+            st.pyplot(plt)
 
-            # 4. Downloadable Report
-            report_json = json.dumps(latest, indent=2)
-            b64 = base64.b64encode(report_json.encode()).decode()
-            href = f'<a href="data:application/json;base64,{b64}" download="bug-report.json">📄 Download Bug Report</a>'
-            st.markdown(href, unsafe_allow_html=True)
+        with col2:
+            st.subheader("Page Load Time Distribution")
+            plt.figure()
+            plt.hist(df["loadTimeMs"], bins=10, color="orange", edgecolor="black")
+            plt.xlabel("Load Time (ms)")
+            plt.ylabel("Frequency")
+            st.pyplot(plt)
 
+        st.subheader("Test Outcome Summary")
+        outcome_counts = df["result"].value_counts()
+        plt.figure()
+        outcome_counts.plot(kind="bar", color=["green", "red"])
+        plt.ylabel("Number of Tests")
+        st.pyplot(plt)
+
+with tabs[1]:
+    st.header("📂 Upload New prediction-log.json")
+    uploaded_file = st.file_uploader("Upload your new prediction-log.json", type=["json"])
+    if uploaded_file is not None:
+        new_data = json.load(uploaded_file)
+        with open(log_file_path, "w") as f:
+            json.dump(new_data, f, indent=2)
+        st.success("✅ Log file updated! Go back to the Dashboard tab to see updated charts.")
+
+with tabs[2]:
+    st.subheader("🌐 Live Website Test")
+
+    url = st.text_input("Enter a URL to test", placeholder="https://example.com")
+
+    if st.button("Run Bug Check"):
+        if not url:
+            st.warning("Please enter a valid URL.")
         else:
-            st.warning("No prediction log found. Did the test complete correctly?")
+            with st.spinner("Running bug check on the website..."):
+                try:
+                    result = subprocess.run(
+                        ["python3", "live_website_checker.py", url],
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        text=True
+                    )
+                    st.code(result.stdout)
+                    # Reload the updated log
+                    with open(PREDICTION_LOG_PATH, "r") as f:
+                        log_data = json.load(f)
+                    st.success("Test complete and prediction-log.json updated!")
+                except Exception as e:
+                    st.error(f"Something went wrong: {e}")
