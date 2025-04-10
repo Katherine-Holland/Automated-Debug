@@ -19,28 +19,26 @@ def run_bug_check(url):
 
         try:
             page.goto(url, timeout=10000)
-            page.wait_for_timeout(3000)  # wait a bit for page to load
+            page.wait_for_load_state("networkidle")  # Wait for full load
+            page.wait_for_timeout(2000)
 
             headline = page.locator("h1").first
             headline_text = headline.inner_text() if headline.count() > 0 else ""
             headline_length = len(headline_text.strip())
             missing_elements = 0 if headline_text else 1
+
         except Exception as e:
             print(f"❌ Error loading {url}: {e}")
-            browser.close()
-            return
+            headline_length = 0
+            missing_elements = 1
+
         finally:
             load_time = (datetime.now() - start_time).total_seconds() * 1000
             browser.close()
 
     # Make prediction
-    try:
-        inputs = scaler.transform([[headline_length, load_time, missing_elements]])
-        prediction = model.predict(inputs)[0][0]
-    except Exception as e:
-        print(f"❌ Prediction error: {e}")
-        return
-
+    inputs = scaler.transform([[headline_length, load_time, missing_elements]])
+    prediction = model.predict(inputs)[0][0]
     result = {
         "timestamp": datetime.utcnow().isoformat(),
         "url": url,
@@ -52,29 +50,24 @@ def run_bug_check(url):
     }
 
     # Log result
-    log_path = "/tmp/prediction-log.json"
+    log_path = "prediction-log.json"
+    if os.path.exists(log_path):
+        with open(log_path, "r") as f:
+            existing_logs = json.load(f)
+    else:
+        existing_logs = []
 
-    try:
-        if os.path.exists(log_path):
-            with open(log_path, "r") as f:
-                existing_logs = json.load(f)
-        else:
-            existing_logs = []
+    existing_logs.append(result)
 
-        existing_logs.append(result)
+    with open(log_path, "w") as f:
+        json.dump(existing_logs, f, indent=2)
 
-        with open(log_path, "w") as f:
-            json.dump(existing_logs, f, indent=2)
-
-        print(f"\n✅ Checked {url}")
-        print(f"🧠 Headline Length: {headline_length}")
-        print(f"⏱️ Load Time: {round(load_time)} ms")
-        print(f"❓ Missing h1: {'Yes' if missing_elements else 'No'}")
-        print(f"🤖 Bug Likelihood: {round(float(prediction), 4)}")
-        print("✅ Prediction successfully written to prediction-log.json")
-
-    except Exception as e:
-        print(f"❌ Logging error: {e}")
+    # Print result
+    print(f"\n✅ Checked {url}")
+    print(f"🧠 Headline Length: {headline_length}")
+    print(f"⏱️ Load Time: {round(load_time)} ms")
+    print(f"❓ Missing h1: {'Yes' if missing_elements else 'No'}")
+    print(f"🤖 Bug Likelihood: {round(float(prediction), 4)}")
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
