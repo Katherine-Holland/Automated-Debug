@@ -9,11 +9,9 @@ from datetime import datetime
 st.set_page_config(page_title="AI Bug Finder", layout="wide")
 st.title("🕷️ AI-Powered Bug Finder Dashboard")
 
-# Debug flag
 st.info("✅ Streamlit app loaded successfully.")
 
 log_file_path = "prediction-log.json"
-PREDICTION_LOG_PATH = "prediction-log.json"
 
 def load_logs(file_path):
     if os.path.exists(file_path):
@@ -21,31 +19,16 @@ def load_logs(file_path):
             return pd.DataFrame(json.load(f))
     return pd.DataFrame()
 
-def log_prediction(entry):
-    if os.path.exists(log_file_path):
-        with open(log_file_path, "r") as f:
-            data = json.load(f)
-    else:
-        data = []
-    data.append(entry)
-    with open(log_file_path, "w") as f:
-        json.dump(data, f, indent=2)
-
 def suggest_fix(entry):
     suggestions = []
-
     if entry.get("missingElements", 0) == 1:
-        suggestions.append("🛠️ Consider adding a `<h1>` tag to clearly label the main heading of the page.")
-
+        suggestions.append("🛠️ Add a `<h1>` tag for the main heading.")
     if entry.get("loadTimeMs", 0) > 3000:
-        suggestions.append("⏳ Load time is high. Optimize images, scripts, or server response times.")
-
+        suggestions.append("⏳ Load time is high. Consider optimizing assets.")
     if entry.get("headlineLength", 0) < 10:
-        suggestions.append("🔤 Headline might be too short or empty. Check content generation or rendering.")
-
+        suggestions.append("🔤 Headline seems too short or missing.")
     if not suggestions:
-        suggestions.append("✅ No obvious issues detected. Your page looks good!")
-
+        suggestions.append("✅ No obvious issues detected!")
     return suggestions
 
 tabs = st.tabs(["📊 Dashboard", "📁 Upload Logs", "🌐 Live Website Test"])
@@ -55,12 +38,12 @@ with tabs[0]:
     df = load_logs(log_file_path)
 
     if df.empty:
-        st.info("No prediction logs found. Please upload a file in the next tab.")
+        st.info("No prediction logs found. Run a test or upload logs.")
     else:
         df["timestamp"] = pd.to_datetime(df["timestamp"], format='mixed', errors='coerce')
         df = df.dropna(subset=["timestamp"])
-        col1, col2 = st.columns(2)
 
+        col1, col2 = st.columns(2)
         with col1:
             st.subheader("Bug Likelihood Over Time")
             plt.figure()
@@ -92,7 +75,7 @@ with tabs[1]:
         new_data = json.load(uploaded_file)
         with open(log_file_path, "w") as f:
             json.dump(new_data, f, indent=2)
-        st.success("✅ Log file updated! Go back to the Dashboard tab to see updated charts.")
+        st.success("✅ Log file updated! Go back to Dashboard.")
 
 with tabs[2]:
     st.subheader("🌐 Live Website Test")
@@ -102,7 +85,7 @@ with tabs[2]:
         if not url:
             st.warning("Please enter a valid URL.")
         else:
-            with st.spinner("Running bug check on the website..."):
+            with st.spinner("Running bug check..."):
                 try:
                     result = subprocess.run(
                         ["python3", "live_website_checker.py", url],
@@ -113,8 +96,8 @@ with tabs[2]:
                     st.code(result.stdout)
                     st.code(result.stderr)
 
-                    if os.path.exists(PREDICTION_LOG_PATH):
-                        with open(PREDICTION_LOG_PATH, "r") as f:
+                    if os.path.exists(log_file_path):
+                        with open(log_file_path, "r") as f:
                             log_data = json.load(f)
                         st.success("Test complete and prediction-log.json updated!")
 
@@ -125,7 +108,7 @@ with tabs[2]:
                             for fix in fixes:
                                 st.markdown(f"- {fix}")
                     else:
-                        st.warning("No prediction-log.json found after running test.")
+                        st.warning("prediction-log.json not found.")
 
                 except Exception as e:
                     st.error(f"Something went wrong: {e}")

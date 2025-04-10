@@ -1,7 +1,12 @@
-import sys
 import os
-from playwright.sync_api import sync_playwright
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # Suppress TensorFlow logs
+
+import sys
 import json
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)
+
+from playwright.sync_api import sync_playwright
 from datetime import datetime
 import joblib
 import numpy as np
@@ -19,19 +24,16 @@ def run_bug_check(url, selector=None):
 
         try:
             page.goto(url, timeout=10000)
-            page.wait_for_timeout(3000)  # Wait for the page to load
+            page.wait_for_timeout(3000)
 
-            # Try default or custom selector
             headline_text = ""
-            if selector:
-                if page.locator(selector).count() > 0:
-                    headline_text = page.locator(selector).first.inner_text().strip()
+            if selector and page.locator(selector).count() > 0:
+                headline_text = page.locator(selector).first.inner_text().strip()
             else:
-                # Fallback chain
-                if page.locator("h1").count() > 0:
-                    headline_text = page.locator("h1").first.inner_text().strip()
-                elif page.locator(".titlelink").count() > 0:
-                    headline_text = page.locator(".titlelink").first.inner_text().strip()
+                for sel in ["h1", ".titlelink", "header h1", "title"]:
+                    if page.locator(sel).count() > 0:
+                        headline_text = page.locator(sel).first.inner_text().strip()
+                        break
 
             headline_length = len(headline_text)
             missing_elements = 0 if headline_text else 1
@@ -43,7 +45,6 @@ def run_bug_check(url, selector=None):
             load_time = (datetime.now() - start_time).total_seconds() * 1000
             browser.close()
 
-    # Make prediction
     inputs = scaler.transform([[headline_length, load_time, missing_elements]])
     prediction = model.predict(inputs)[0][0]
     result = {
@@ -56,27 +57,20 @@ def run_bug_check(url, selector=None):
         "result": "ran test"
     }
 
-    # Log result
     log_path = "prediction-log.json"
-
     try:
+        existing_logs = []
         if os.path.exists(log_path):
             with open(log_path, "r") as f:
                 existing_logs = json.load(f)
-        else:
-            existing_logs = []
-
         existing_logs.append(result)
-
         with open(log_path, "w") as f:
             json.dump(existing_logs, f, indent=2)
 
-        # Print result
         print(f"\n✅ Checked {url}")
-        print(f"📌 Selector Used: {selector if selector else 'h1 / fallback'}")
         print(f"🧠 Headline Length: {headline_length}")
         print(f"⏱️ Load Time: {round(load_time)} ms")
-        print(f"❓ Missing: {'Yes' if missing_elements else 'No'}")
+        print(f"❓ Missing Element: {'Yes' if missing_elements else 'No'}")
         print(f"🤖 Bug Likelihood: {round(float(prediction), 4)}")
 
     except Exception as e:
