@@ -6,6 +6,10 @@ import os
 import subprocess
 from datetime import datetime
 
+# 🛠️ Ensure Playwright is installed in Streamlit Cloud
+if not os.path.exists("/home/appuser/.cache/ms-playwright"):
+    subprocess.run(["playwright", "install", "--with-deps"], check=True)
+
 log_file_path = "prediction-log.json"
 PREDICTION_LOG_PATH = "prediction-log.json"
 
@@ -106,12 +110,13 @@ with tabs[2]:
                         text=True
                     )
                     st.code(result.stdout)
+
                     # Reload the updated log
                     with open(PREDICTION_LOG_PATH, "r") as f:
                         log_data = json.load(f)
                     st.success("Test complete and prediction-log.json updated!")
 
-                    # Suggest fixes
+                    # Show AI fix suggestions
                     if log_data:
                         last_result = log_data[-1]
                         fixes = suggest_fix(last_result)
