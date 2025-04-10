@@ -52,7 +52,7 @@ def run_bug_check(url):
     }
 
     # Log result
-    log_path = "prediction-log.json"
+    log_path = "/tmp/prediction-log.json"
 
     try:
         if os.path.exists(log_path):
