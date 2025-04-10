@@ -38,7 +38,7 @@ RUN pip install --upgrade pip && \
 
 # Install Playwright and its dependencies
 RUN pip install playwright && \
-    playwright install-deps
+    playwright install chromium
 
 # Expose the port used by Streamlit
 EXPOSE 8501
