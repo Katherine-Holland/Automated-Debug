@@ -1,11 +1,9 @@
 services:
   - type: web
     name: ai-bug-finder
-    runtime: python
-    buildCommand: |
-      pip install -r requirements.txt
-      python -m playwright install --with-deps
-    startCommand: streamlit run bugfinder_app.py --server.port=$PORT --server.enableCORS false
+    plan: free
+    autoDeploy: true
+    dockerfilePath: Dockerfile
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.12.1
+      - key: PYTHONUNBUFFERED
+        value: "1"
