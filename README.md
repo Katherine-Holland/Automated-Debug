@@ -1,3 +1,4 @@
+
 # Automated-Debug
 
 Uh oh! You have a web application that displays real-time data from multiple sources. Sometimes, the data fails to update correctly, or there are discrepancies in the values.  
@@ -25,16 +26,18 @@ npm install --save-dev @playwright/test
 
 ```
 .
-├── playwright.config.js           # Playwright configuration file
+├── playwright.config.js
+├── bugfinder_app.py                # Streamlit dashboard
+├── live_website_checker.py        # AI-powered URL tester
+├── prediction-log.json            # Log file for all predictions
 └── tests/
-    └── bugChecker.spec.js         # Our main test script
+    └── bugChecker.spec.js         # Playwright test script
 ```
 
 ---
 
 ## 🚀 Running the Test
 
-To execute the script:
 ```bash
 npx playwright test
 ```
@@ -43,164 +46,73 @@ If the headline on Hacker News is shorter than expected, the test fails and save
 
 ![Bug Screenshot Example](./error-screenshot.png)
 
-> ✅ If the headline is valid, the test will simply pass.
-
----
-
-## 🧪 What the Script Does
-
-1. Opens [https://news.ycombinator.com](https://news.ycombinator.com)
-2. Extracts the first post headline
-3. Checks its length (we set an intentionally high threshold to simulate bugs)
-4. On failure:
-   - Takes a screenshot
-   - Fails the test
-   - Saves full trace and video (great for debugging!)
-
----
-
-## 🔍 Bonus Debugging Tools
-
-After a failed run, Playwright also stores:
-- 📸 `test-results/` folder with screenshots and videos
-- 🕵️ A trace file you can view with:
-
-```bash
-npx playwright show-trace test-results/<your-trace-file>.zip
-```
-
 ---
 
 ## 🤖 AI-Powered Bug Prediction
 
-We've trained a TensorFlow model to predict bugs before they even happen!
-
-This model takes three real-time features:
+A trained TensorFlow model predicts bugs in real-time based on:
 - `headlineLength`
 - `loadTimeMs`
 - `missingElements`
 
-And estimates the likelihood of a bug occurring. If the prediction is **below a certain threshold**, the test will automatically **skip** to save time and resources.
-
-### 🧠 How It Works
-1. A Python script (`predictor_bridge.py`) loads the trained AI model.
-2. It accepts input from the Playwright test (e.g., `18 1600 2`) and returns a prediction score.
-3. If the predicted likelihood is high (e.g., > 0.5), the test proceeds and validates the page.
-4. If the likelihood is low, the test logs it and skips!
-
-### Example Output:
-
-```bash
-🔍 Raw prediction output: 0.6215
-🤖 AI Prediction: Bug Likelihood = 0.62
-✅ AI predicts no bug — skipping test.
-```
-
-> You can adjust the threshold logic in `bugChecker.spec.js` to suit your use case.
-
----
-
-## 📁 Additional Files
-
-```
-.
-├── bug_predictor_model.keras      # Trained AI model (TensorFlow)
-├── bug_scaler.save                # Scaler for input normalization
-├── predictor_bridge.py            # Python bridge script for predictions
-├── train_bug_predictor.py         # Train your own model on synthetic data
-├── synthetic_bug_data.csv         # Dataset used for model training
-```
-
----
-
-## 🧠 Training Your Own AI Model
-
-Want to re-train the bug predictor? Run:
-
-```bash
-python train_bug_predictor.py
-```
-
-This will:
-- Load `synthetic_bug_data.csv`
-- Train a neural network
-- Save the model and scaler
-
----
-
-## 📊 AI Bug Detection Insights
-
-Our Playwright test now uses a trained TensorFlow model to predict the likelihood of bugs. Each run logs:
-
-- Headline length
-- Load time
-- Missing elements
-- Predicted bug likelihood
-
-### 📈 Charts from Prediction Logs
-
-#### Bug Likelihood Over Time
-![Bug Likelihood Over Time](./charts/bug_likelihood_over_time.png)
-
-#### Page Load Time Distribution
-![Load Time Distribution](./charts/load_time_distribution.png)
-
-#### Test Outcome Summary
-![Test Outcome Summary](./charts/test_outcomes.png)
-
----
-
-## 🧰 Python Setup (for AI and Dashboard)
-
-If you're using the AI predictor or dashboard features, you’ll need Python with a few libraries installed.
-
-### Install required Python packages:
-
-```bash
-pip install -r requirements.txt
-```
-
-Your `requirements.txt` should contain:
-
-```
-streamlit
-matplotlib
-pandas
-tensorflow
-scikit-learn
-playwright
-```
+If the likelihood of a bug is high (> 0.5), the test continues. If low, it skips to save time.
 
 ---
 
 ## 🌐 Live AI Dashboard with Streamlit
 
-We’ve built a real-time dashboard using [Streamlit](https://streamlit.io/) to visualize bug prediction trends and test logs.
-
-Launch it like this:
-
 ```bash
 streamlit run bugfinder_app.py
 ```
 
-Then open the local link it provides (usually `http://localhost:8501`) in your browser.
-
-### 📋 Features:
+### Features:
 - 📈 Bug likelihood over time
 - ⏱️ Load time distribution
 - 📊 Test outcome summary
-- 📂 Upload new `prediction-log.json` to refresh charts in real time
-- 🌐 Enter a website URL to test for bugs using AI prediction
+- 📂 Upload new logs to refresh visuals
+- 🔍 Test any live URL with bug prediction
+- 🧠 AI-powered suggestions shown for each issue
 
-## 🧠 Run the BugFinder App (Streamlit UI)
+---
 
-Launch the visual interface to test any website URL:
+## ✨ Example Suggestions from the AI
 
-```bash
-streamlit run bugfinder_app.py
+After testing a site, the system will offer fixes, like:
+
+- 🛠️ Consider adding a `<h1>` tag to clearly label the main heading of the page.
+- ⏳ Load time is high. Optimize images, scripts, or server response times.
+- 🔤 Headline might be too short or empty. Check content generation or rendering.
+
+These appear directly below each test result in the dashboard.
+
+---
+
+## 📁 Other AI Files
+
+```
+├── bug_predictor_model.keras      # Trained model
+├── bug_scaler.save                # Scaler for normalization
+├── predictor_bridge.py            # Python script used by Playwright
+├── synthetic_bug_data.csv         # Training data
+├── train_bug_predictor.py         # Training script
 ```
 
-Enter a URL and view:
-- ✅ Bug prediction score
-- 📸 Screenshot of the issue (via Playwright)
-- 📄 JSON report log for download
+---
+
+## 🔁 Training Your Own Model
+
+```bash
+python train_bug_predictor.py
+```
+
+---
+
+## ✅ Python Requirements
+
+Install dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+---

@@ -28,6 +28,23 @@ def log_prediction(entry):
     with open(log_file_path, "w") as f:
         json.dump(data, f, indent=2)
 
+def suggest_fix(entry):
+    suggestions = []
+
+    if entry.get("missingElements", 0) == 1:
+        suggestions.append("🛠️ Consider adding a `<h1>` tag to clearly label the main heading of the page.")
+
+    if entry.get("loadTimeMs", 0) > 3000:
+        suggestions.append("⏳ Load time is high. Optimize images, scripts, or server response times.")
+
+    if entry.get("headlineLength", 0) < 10:
+        suggestions.append("🔤 Headline might be too short or empty. Check content generation or rendering.")
+
+    if not suggestions:
+        suggestions.append("✅ No obvious issues detected. Your page looks good!")
+
+    return suggestions
+
 tabs = st.tabs(["📊 Dashboard", "📁 Upload Logs", "🌐 Live Website Test"])
 
 with tabs[0]:
@@ -37,7 +54,8 @@ with tabs[0]:
     if df.empty:
         st.info("No prediction logs found. Please upload a file in the next tab.")
     else:
-        df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce", format="ISO8601")
+        df["timestamp"] = pd.to_datetime(df["timestamp"], format='mixed', errors='coerce')
+        df = df.dropna(subset=["timestamp"])
         col1, col2 = st.columns(2)
 
         with col1:
@@ -95,5 +113,14 @@ with tabs[2]:
                     with open(PREDICTION_LOG_PATH, "r") as f:
                         log_data = json.load(f)
                     st.success("Test complete and prediction-log.json updated!")
+
+                    # Suggest fixes
+                    if log_data:
+                        last_result = log_data[-1]
+                        fixes = suggest_fix(last_result)
+                        st.markdown("### 🧠 Suggested Fixes:")
+                        for fix in fixes:
+                            st.markdown(f"- {fix}")
+
                 except Exception as e:
                     st.error(f"Something went wrong: {e}")
