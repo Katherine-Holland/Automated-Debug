@@ -11,27 +11,34 @@ from tensorflow.keras.models import load_model
 model = load_model("bug_predictor_model.keras")
 scaler = joblib.load("bug_scaler.save")
 
-def run_bug_check(url):
+def run_bug_check(url, selector=None):
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True, args=["--no-sandbox"])
+        browser = p.chromium.launch()
         page = browser.new_page()
         start_time = datetime.now()
 
         try:
             page.goto(url, timeout=10000)
-            page.wait_for_load_state("networkidle")  # Wait for full load
-            page.wait_for_timeout(2000)
+            page.wait_for_timeout(3000)  # Wait for the page to load
 
-            headline = page.locator("h1").first
-            headline_text = headline.inner_text() if headline.count() > 0 else ""
-            headline_length = len(headline_text.strip())
+            # Try default or custom selector
+            headline_text = ""
+            if selector:
+                if page.locator(selector).count() > 0:
+                    headline_text = page.locator(selector).first.inner_text().strip()
+            else:
+                # Fallback chain
+                if page.locator("h1").count() > 0:
+                    headline_text = page.locator("h1").first.inner_text().strip()
+                elif page.locator(".titlelink").count() > 0:
+                    headline_text = page.locator(".titlelink").first.inner_text().strip()
+
+            headline_length = len(headline_text)
             missing_elements = 0 if headline_text else 1
 
         except Exception as e:
             print(f"❌ Error loading {url}: {e}")
-            headline_length = 0
-            missing_elements = 1
-
+            return
         finally:
             load_time = (datetime.now() - start_time).total_seconds() * 1000
             browser.close()
@@ -51,26 +58,34 @@ def run_bug_check(url):
 
     # Log result
     log_path = "prediction-log.json"
-    if os.path.exists(log_path):
-        with open(log_path, "r") as f:
-            existing_logs = json.load(f)
-    else:
-        existing_logs = []
 
-    existing_logs.append(result)
+    try:
+        if os.path.exists(log_path):
+            with open(log_path, "r") as f:
+                existing_logs = json.load(f)
+        else:
+            existing_logs = []
 
-    with open(log_path, "w") as f:
-        json.dump(existing_logs, f, indent=2)
+        existing_logs.append(result)
 
-    # Print result
-    print(f"\n✅ Checked {url}")
-    print(f"🧠 Headline Length: {headline_length}")
-    print(f"⏱️ Load Time: {round(load_time)} ms")
-    print(f"❓ Missing h1: {'Yes' if missing_elements else 'No'}")
-    print(f"🤖 Bug Likelihood: {round(float(prediction), 4)}")
+        with open(log_path, "w") as f:
+            json.dump(existing_logs, f, indent=2)
+
+        # Print result
+        print(f"\n✅ Checked {url}")
+        print(f"📌 Selector Used: {selector if selector else 'h1 / fallback'}")
+        print(f"🧠 Headline Length: {headline_length}")
+        print(f"⏱️ Load Time: {round(load_time)} ms")
+        print(f"❓ Missing: {'Yes' if missing_elements else 'No'}")
+        print(f"🤖 Bug Likelihood: {round(float(prediction), 4)}")
+
+    except Exception as e:
+        print(f"⚠️ Failed to log result: {e}")
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: python3 live_website_checker.py <URL>")
+        print("Usage: python3 live_website_checker.py <URL> [optional selector]")
     else:
-        run_bug_check(sys.argv[1])
+        url = sys.argv[1]
+        selector = sys.argv[2] if len(sys.argv) > 2 else None
+        run_bug_check(url, selector)

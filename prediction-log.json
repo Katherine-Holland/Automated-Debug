@@ -33,5 +33,14 @@
     "missingElements": 0,
     "prediction": 0.813,
     "result": "ran test"
+  },
+  {
+    "timestamp": "2025-04-10T14:25:41.338602",
+    "url": "https://news.ycombinator.com",
+    "headlineLength": 0,
+    "loadTimeMs": 3333,
+    "missingElements": 1,
+    "prediction": 0.7735,
+    "result": "ran test"
   }
 ]
