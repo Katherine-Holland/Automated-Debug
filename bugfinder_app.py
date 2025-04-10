@@ -108,7 +108,13 @@ with tabs[2]:
                         stderr=subprocess.PIPE,
                         text=True
                     )
+
+                    # Display raw output from script
+                    st.subheader("🖨️ STDOUT:")
                     st.code(result.stdout)
+
+                    st.subheader("🐞 STDERR:")
+                    st.code(result.stderr)
 
                     # Reload the updated log
                     if os.path.exists(PREDICTION_LOG_PATH):
