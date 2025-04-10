@@ -13,7 +13,7 @@ scaler = joblib.load("bug_scaler.save")
 
 def run_bug_check(url):
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+        browser = p.chromium.launch(headless=True, args=["--no-sandbox"])
         page = browser.new_page()
         start_time = datetime.now()
 
