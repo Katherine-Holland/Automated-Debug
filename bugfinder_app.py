@@ -5,14 +5,6 @@ import json
 import os
 import subprocess
 from datetime import datetime
-import subprocess
-import os
-
-if not os.path.exists("/home/appuser/.cache/ms-playwright"):
-    subprocess.run(["./setup.sh"], check=True)
-
-st.set_page_config(page_title="AI Bug Finder", layout="wide")
-st.title("🕷️ AI-Powered Bug Finder Dashboard")
 
 log_file_path = "prediction-log.json"
 PREDICTION_LOG_PATH = "prediction-log.json"
