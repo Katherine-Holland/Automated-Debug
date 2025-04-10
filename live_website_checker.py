@@ -13,7 +13,7 @@ scaler = joblib.load("bug_scaler.save")
 
 def run_bug_check(url):
     with sync_playwright() as p:
-        browser = p.chromium.launch()
+        browser = p.chromium.launch(headless=True)
         page = browser.new_page()
         start_time = datetime.now()
 
@@ -27,14 +27,20 @@ def run_bug_check(url):
             missing_elements = 0 if headline_text else 1
         except Exception as e:
             print(f"❌ Error loading {url}: {e}")
+            browser.close()
             return
         finally:
             load_time = (datetime.now() - start_time).total_seconds() * 1000
             browser.close()
 
     # Make prediction
-    inputs = scaler.transform([[headline_length, load_time, missing_elements]])
-    prediction = model.predict(inputs)[0][0]
+    try:
+        inputs = scaler.transform([[headline_length, load_time, missing_elements]])
+        prediction = model.predict(inputs)[0][0]
+    except Exception as e:
+        print(f"❌ Prediction error: {e}")
+        return
+
     result = {
         "timestamp": datetime.utcnow().isoformat(),
         "url": url,
@@ -48,30 +54,30 @@ def run_bug_check(url):
     # Log result
     log_path = "prediction-log.json"
 
-    # Load existing log data if file exists
-    if os.path.exists(log_path):
-        with open(log_path, "r") as f:
-            existing_logs = json.load(f)
-    else:
-        existing_logs = []
+    try:
+        if os.path.exists(log_path):
+            with open(log_path, "r") as f:
+                existing_logs = json.load(f)
+        else:
+            existing_logs = []
 
-    # Append new result
-    existing_logs.append(result)
+        existing_logs.append(result)
 
-    # Save updated log
-    with open(log_path, "w") as f:
-        json.dump(existing_logs, f, indent=2)
+        with open(log_path, "w") as f:
+            json.dump(existing_logs, f, indent=2)
 
-    # Print result
-    print(f"\n✅ Checked {url}")
-    print(f"🧠 Headline Length: {headline_length}")
-    print(f"⏱️ Load Time: {round(load_time)} ms")
-    print(f"❓ Missing h1: {'Yes' if missing_elements else 'No'}")
-    print(f"🤖 Bug Likelihood: {round(float(prediction), 4)}")
+        print(f"\n✅ Checked {url}")
+        print(f"🧠 Headline Length: {headline_length}")
+        print(f"⏱️ Load Time: {round(load_time)} ms")
+        print(f"❓ Missing h1: {'Yes' if missing_elements else 'No'}")
+        print(f"🤖 Bug Likelihood: {round(float(prediction), 4)}")
+        print("✅ Prediction successfully written to prediction-log.json")
+
+    except Exception as e:
+        print(f"❌ Logging error: {e}")
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Usage: python3 live_website_checker.py <URL>")
     else:
         run_bug_check(sys.argv[1])
-
