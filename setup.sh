@@ -1,3 +1,1 @@
-#!/bin/bash
-apt-get update
-apt-get install -y wget gnupg unzip
+python -m playwright install --with-deps

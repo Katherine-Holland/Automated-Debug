@@ -3,7 +3,6 @@ services:
     name: catch-the-bugs
     env: python
     buildCommand: |
-      ./setup.sh
       pip install -r requirements.txt
       python -m playwright install --with-deps
     startCommand: streamlit run bugfinder_app.py --server.port=$PORT --server.enableCORS false --server.enableXsrfProtection false
