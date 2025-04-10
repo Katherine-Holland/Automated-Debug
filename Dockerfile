@@ -38,7 +38,7 @@ RUN pip install --upgrade pip && \
 
 # Install Playwright and its dependencies
 RUN pip install playwright && \
-    playwright install --with-deps
+    playwright install-deps
 
 # Expose the port used by Streamlit
 EXPOSE 8501
