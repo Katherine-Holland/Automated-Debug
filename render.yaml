@@ -1,11 +1,11 @@
 services:
   - type: web
-    name: catch-the-bugs
-    env: python
+    name: ai-bug-finder
+    runtime: python
     buildCommand: |
       pip install -r requirements.txt
       python -m playwright install --with-deps
-    startCommand: streamlit run bugfinder_app.py --server.port=$PORT --server.enableCORS false --server.enableXsrfProtection false
-    runtime: python
-    region: oregon
-    plan: free
+    startCommand: streamlit run bugfinder_app.py --server.port=$PORT --server.enableCORS false
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.1
