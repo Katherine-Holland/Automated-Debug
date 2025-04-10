@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: ai-bug-finder
+    runtime: python
+    buildCommand: |
+      apt-get update && \
+      apt-get install -y wget gnupg unzip && \
+      playwright install --with-deps && \
+      pip install -r requirements.txt
+    startCommand: streamlit run bugfinder_app.py --server.port=$PORT --server.enableCORS false
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.1

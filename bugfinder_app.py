@@ -6,8 +6,6 @@ from playwright.sync_api import sync_playwright
 import joblib
 import numpy as np
 from tensorflow.keras.models import load_model
-os.system('playwright install')
-os.system('playwright install-deps')
 
 # Load model and scaler
 model = load_model("bug_predictor_model.keras")
