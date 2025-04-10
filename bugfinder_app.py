@@ -9,9 +9,13 @@ from datetime import datetime
 st.set_page_config(page_title="AI Bug Finder", layout="wide")
 st.title("🕷️ AI-Powered Bug Finder Dashboard")
 
+log_file_path = "prediction-log.json"
+PREDICTION_LOG_PATH = "prediction-log.json"
+
+# Show successful load
 st.info("✅ Streamlit app loaded successfully.")
 
-log_file_path = "prediction-log.json"
+# --- UTILS ---
 
 def load_logs(file_path):
     if os.path.exists(file_path):
@@ -21,29 +25,37 @@ def load_logs(file_path):
 
 def suggest_fix(entry):
     suggestions = []
+
     if entry.get("missingElements", 0) == 1:
-        suggestions.append("🛠️ Add a `<h1>` tag for the main heading.")
+        suggestions.append("🛠️ Consider adding a `<h1>` tag to clearly label the main heading of the page.")
     if entry.get("loadTimeMs", 0) > 3000:
-        suggestions.append("⏳ Load time is high. Consider optimizing assets.")
+        suggestions.append("⏳ Load time is high. Optimize images, scripts, or server response times.")
     if entry.get("headlineLength", 0) < 10:
-        suggestions.append("🔤 Headline seems too short or missing.")
+        suggestions.append("🔤 Headline might be too short or empty. Check content generation or rendering.")
     if not suggestions:
-        suggestions.append("✅ No obvious issues detected!")
+        suggestions.append("✅ No obvious issues detected. Your page looks good!")
+
     return suggestions
 
+# --- TABS ---
 tabs = st.tabs(["📊 Dashboard", "📁 Upload Logs", "🌐 Live Website Test"])
 
+# === TAB 1: DASHBOARD ===
 with tabs[0]:
     st.header("📈 Bug Detection Insights")
+
+    if st.button("🔁 Refresh Dashboard"):
+        st.rerun()
+
     df = load_logs(log_file_path)
 
     if df.empty:
-        st.info("No prediction logs found. Run a test or upload logs.")
+        st.info("No prediction logs found. Please run a live test or upload a file.")
     else:
         df["timestamp"] = pd.to_datetime(df["timestamp"], format='mixed', errors='coerce')
         df = df.dropna(subset=["timestamp"])
-
         col1, col2 = st.columns(2)
+
         with col1:
             st.subheader("Bug Likelihood Over Time")
             plt.figure()
@@ -68,6 +80,7 @@ with tabs[0]:
         plt.ylabel("Number of Tests")
         st.pyplot(plt)
 
+# === TAB 2: UPLOAD LOG ===
 with tabs[1]:
     st.header("📂 Upload New prediction-log.json")
     uploaded_file = st.file_uploader("Upload your new prediction-log.json", type=["json"])
@@ -75,8 +88,9 @@ with tabs[1]:
         new_data = json.load(uploaded_file)
         with open(log_file_path, "w") as f:
             json.dump(new_data, f, indent=2)
-        st.success("✅ Log file updated! Go back to Dashboard.")
+        st.success("✅ Log file updated! Go back to the Dashboard tab to see updated charts.")
 
+# === TAB 3: LIVE TEST ===
 with tabs[2]:
     st.subheader("🌐 Live Website Test")
     url = st.text_input("Enter a URL to test", placeholder="https://example.com")
@@ -85,7 +99,7 @@ with tabs[2]:
         if not url:
             st.warning("Please enter a valid URL.")
         else:
-            with st.spinner("Running bug check..."):
+            with st.spinner("Running bug check on the website..."):
                 try:
                     result = subprocess.run(
                         ["python3", "live_website_checker.py", url],
@@ -96,19 +110,23 @@ with tabs[2]:
                     st.code(result.stdout)
                     st.code(result.stderr)
 
-                    if os.path.exists(log_file_path):
-                        with open(log_file_path, "r") as f:
+                    if os.path.exists(PREDICTION_LOG_PATH):
+                        with open(PREDICTION_LOG_PATH, "r") as f:
                             log_data = json.load(f)
                         st.success("Test complete and prediction-log.json updated!")
 
+                        # Display just the last result
                         if log_data:
                             last_result = log_data[-1]
+                            st.subheader("🆕 Latest Result")
+                            st.json(last_result)
+
                             fixes = suggest_fix(last_result)
                             st.markdown("### 🧠 Suggested Fixes:")
                             for fix in fixes:
                                 st.markdown(f"- {fix}")
                     else:
-                        st.warning("prediction-log.json not found.")
+                        st.warning("No prediction-log.json found after running test.")
 
                 except Exception as e:
                     st.error(f"Something went wrong: {e}")
