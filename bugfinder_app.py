@@ -10,49 +10,42 @@ st.set_page_config(page_title="AI Bug Finder", layout="wide")
 st.title("🕷️ AI-Powered Bug Finder Dashboard")
 
 log_file_path = "prediction-log.json"
-PREDICTION_LOG_PATH = "prediction-log.json"
 
-# Show successful load
 st.info("✅ Streamlit app loaded successfully.")
 
-# --- UTILS ---
-
-def load_logs(file_path):
-    if os.path.exists(file_path):
-        with open(file_path, "r") as f:
+# Load logs
+def load_logs():
+    if os.path.exists(log_file_path):
+        with open(log_file_path, "r") as f:
             return pd.DataFrame(json.load(f))
     return pd.DataFrame()
 
 def suggest_fix(entry):
     suggestions = []
-
     if entry.get("missingElements", 0) == 1:
-        suggestions.append("🛠️ Consider adding a `<h1>` tag to clearly label the main heading of the page.")
+        suggestions.append("🛠️ Consider adding a `<h1>` tag.")
     if entry.get("loadTimeMs", 0) > 3000:
-        suggestions.append("⏳ Load time is high. Optimize images, scripts, or server response times.")
+        suggestions.append("⏳ Load time is high. Optimize resources.")
     if entry.get("headlineLength", 0) < 10:
-        suggestions.append("🔤 Headline might be too short or empty. Check content generation or rendering.")
+        suggestions.append("🔤 Headline may be too short or missing.")
     if not suggestions:
-        suggestions.append("✅ No obvious issues detected. Your page looks good!")
-
+        suggestions.append("✅ No issues found.")
     return suggestions
 
-# --- TABS ---
 tabs = st.tabs(["📊 Dashboard", "📁 Upload Logs", "🌐 Live Website Test"])
 
-# === TAB 1: DASHBOARD ===
+# --- Dashboard
 with tabs[0]:
     st.header("📈 Bug Detection Insights")
-
     if st.button("🔁 Refresh Dashboard"):
         st.rerun()
 
-    df = load_logs(log_file_path)
+    df = load_logs()
 
     if df.empty:
-        st.info("No prediction logs found. Please run a live test or upload a file.")
+        st.info("No logs yet. Please run a test or upload a file.")
     else:
-        df["timestamp"] = pd.to_datetime(df["timestamp"], format='mixed', errors='coerce')
+        df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
         df = df.dropna(subset=["timestamp"])
         col1, col2 = st.columns(2)
 
@@ -61,7 +54,6 @@ with tabs[0]:
             plt.figure()
             plt.plot(df["timestamp"], df["prediction"], marker="o")
             plt.xticks(rotation=45)
-            plt.ylabel("Bug Likelihood")
             plt.tight_layout()
             st.pyplot(plt)
 
@@ -77,56 +69,47 @@ with tabs[0]:
         outcome_counts = df["result"].value_counts()
         plt.figure()
         outcome_counts.plot(kind="bar", color=["green", "red"])
-        plt.ylabel("Number of Tests")
+        plt.ylabel("Test Count")
         st.pyplot(plt)
 
-# === TAB 2: UPLOAD LOG ===
+# --- Upload Logs
 with tabs[1]:
-    st.header("📂 Upload New prediction-log.json")
-    uploaded_file = st.file_uploader("Upload your new prediction-log.json", type=["json"])
-    if uploaded_file is not None:
+    st.header("📂 Upload prediction-log.json")
+    uploaded_file = st.file_uploader("Upload prediction-log.json", type=["json"])
+    if uploaded_file:
         new_data = json.load(uploaded_file)
         with open(log_file_path, "w") as f:
             json.dump(new_data, f, indent=2)
-        st.success("✅ Log file updated! Go back to the Dashboard tab to see updated charts.")
+        st.success("✅ Log updated! Go to the dashboard tab.")
 
-# === TAB 3: LIVE TEST ===
+# --- Live Test
 with tabs[2]:
-    st.subheader("🌐 Live Website Test")
-    url = st.text_input("Enter a URL to test", placeholder="https://example.com")
-
+    st.header("🌐 Live Website Test")
+    url = st.text_input("Enter a URL", placeholder="https://example.com")
     if st.button("Run Bug Check"):
         if not url:
             st.warning("Please enter a valid URL.")
         else:
-            with st.spinner("Running bug check on the website..."):
-                try:
-                    result = subprocess.run(
-                        ["python3", "live_website_checker.py", url],
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE,
-                        text=True
-                    )
-                    st.code(result.stdout)
-                    st.code(result.stderr)
+            with st.spinner("Running check..."):
+                result = subprocess.run(
+                    ["python3", "live_website_checker.py", url],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True
+                )
+                st.code(result.stdout)
+                st.code(result.stderr)
 
-                    if os.path.exists(PREDICTION_LOG_PATH):
-                        with open(PREDICTION_LOG_PATH, "r") as f:
-                            log_data = json.load(f)
-                        st.success("Test complete and prediction-log.json updated!")
+                if os.path.exists(log_file_path):
+                    with open(log_file_path, "r") as f:
+                        logs = json.load(f)
+                        last = logs[-1]
+                        st.subheader("🆕 Last Result")
+                        st.json(last)
 
-                        # Display just the last result
-                        if log_data:
-                            last_result = log_data[-1]
-                            st.subheader("🆕 Latest Result")
-                            st.json(last_result)
-
-                            fixes = suggest_fix(last_result)
-                            st.markdown("### 🧠 Suggested Fixes:")
-                            for fix in fixes:
-                                st.markdown(f"- {fix}")
-                    else:
-                        st.warning("No prediction-log.json found after running test.")
-
-                except Exception as e:
-                    st.error(f"Something went wrong: {e}")
+                        fixes = suggest_fix(last)
+                        st.markdown("### 💡 Suggested Fixes:")
+                        for fix in fixes:
+                            st.markdown(f"- {fix}")
+                else:
+                    st.warning("No log file found after test.")
