@@ -4,19 +4,19 @@ import matplotlib.pyplot as plt
 import json
 import os
 import subprocess
+from pathlib import Path
 from datetime import datetime
 
 st.set_page_config(page_title="AI Bug Finder", layout="wide")
 st.title("🕷️ AI-Powered Bug Finder Dashboard")
-
-log_file_path = "prediction-log.json"
-
 st.info("✅ Streamlit app loaded successfully.")
 
-# Load logs
-def load_logs():
-    if os.path.exists(log_file_path):
-        with open(log_file_path, "r") as f:
+log_file_path = Path("logs/prediction-log.json")
+log_file_path.parent.mkdir(exist_ok=True)
+
+def load_logs(path):
+    if path.exists():
+        with open(path, "r") as f:
             return pd.DataFrame(json.load(f))
     return pd.DataFrame()
 
@@ -25,27 +25,23 @@ def suggest_fix(entry):
     if entry.get("missingElements", 0) == 1:
         suggestions.append("🛠️ Consider adding a `<h1>` tag.")
     if entry.get("loadTimeMs", 0) > 3000:
-        suggestions.append("⏳ Load time is high. Optimize resources.")
+        suggestions.append("⏳ Optimize load performance.")
     if entry.get("headlineLength", 0) < 10:
-        suggestions.append("🔤 Headline may be too short or missing.")
-    if not suggestions:
-        suggestions.append("✅ No issues found.")
-    return suggestions
+        suggestions.append("🔤 Improve headline clarity.")
+    return suggestions or ["✅ No obvious issues detected."]
 
 tabs = st.tabs(["📊 Dashboard", "📁 Upload Logs", "🌐 Live Website Test"])
 
-# --- Dashboard
 with tabs[0]:
     st.header("📈 Bug Detection Insights")
     if st.button("🔁 Refresh Dashboard"):
         st.rerun()
 
-    df = load_logs()
-
+    df = load_logs(log_file_path)
     if df.empty:
-        st.info("No logs yet. Please run a test or upload a file.")
+        st.info("No prediction logs found. Run a test or upload one.")
     else:
-        df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
+        df["timestamp"] = pd.to_datetime(df["timestamp"], errors='coerce')
         df = df.dropna(subset=["timestamp"])
         col1, col2 = st.columns(2)
 
@@ -54,7 +50,7 @@ with tabs[0]:
             plt.figure()
             plt.plot(df["timestamp"], df["prediction"], marker="o")
             plt.xticks(rotation=45)
-            plt.tight_layout()
+            plt.ylabel("Bug Likelihood")
             st.pyplot(plt)
 
         with col2:
@@ -69,47 +65,46 @@ with tabs[0]:
         outcome_counts = df["result"].value_counts()
         plt.figure()
         outcome_counts.plot(kind="bar", color=["green", "red"])
-        plt.ylabel("Test Count")
         st.pyplot(plt)
 
-# --- Upload Logs
 with tabs[1]:
-    st.header("📂 Upload prediction-log.json")
-    uploaded_file = st.file_uploader("Upload prediction-log.json", type=["json"])
+    st.header("📂 Upload New prediction-log.json")
+    uploaded_file = st.file_uploader("Upload your new prediction-log.json", type=["json"])
     if uploaded_file:
-        new_data = json.load(uploaded_file)
         with open(log_file_path, "w") as f:
-            json.dump(new_data, f, indent=2)
-        st.success("✅ Log updated! Go to the dashboard tab.")
+            json.dump(json.load(uploaded_file), f, indent=2)
+        st.success("✅ Log file updated! Return to Dashboard.")
 
-# --- Live Test
 with tabs[2]:
-    st.header("🌐 Live Website Test")
-    url = st.text_input("Enter a URL", placeholder="https://example.com")
+    st.subheader("🌐 Live Website Test")
+    url = st.text_input("Enter a URL to test", placeholder="https://example.com")
     if st.button("Run Bug Check"):
         if not url:
-            st.warning("Please enter a valid URL.")
+            st.warning("Please enter a URL.")
         else:
             with st.spinner("Running check..."):
-                result = subprocess.run(
-                    ["python3", "live_website_checker.py", url],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True
-                )
-                st.code(result.stdout)
-                st.code(result.stderr)
+                try:
+                    result = subprocess.run(
+                        ["python3", "live_website_checker.py", url],
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        text=True
+                    )
+                    st.code(result.stdout)
+                    st.code(result.stderr)
 
-                if os.path.exists(log_file_path):
-                    with open(log_file_path, "r") as f:
-                        logs = json.load(f)
-                        last = logs[-1]
-                        st.subheader("🆕 Last Result")
-                        st.json(last)
+                    if log_file_path.exists():
+                        with open(log_file_path, "r") as f:
+                            log_data = json.load(f)
+                            last = log_data[-1]
+                            st.subheader("🆕 Last Result")
+                            st.json(last)
 
-                        fixes = suggest_fix(last)
-                        st.markdown("### 💡 Suggested Fixes:")
-                        for fix in fixes:
-                            st.markdown(f"- {fix}")
-                else:
-                    st.warning("No log file found after test.")
+                            st.markdown("### 💡 Suggested Fixes:")
+                            for fix in suggest_fix(last):
+                                st.markdown(f"- {fix}")
+                    else:
+                        st.warning("Log file not found after test.")
+
+                except Exception as e:
+                    st.error(f"Something went wrong: {e}")

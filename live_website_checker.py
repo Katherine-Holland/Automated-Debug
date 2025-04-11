@@ -1,16 +1,21 @@
 import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # Suppress TensorFlow logs
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 import sys
 import json
 import warnings
-warnings.filterwarnings("ignore", category=UserWarning)  # Suppress sklearn warnings
-
-from playwright.sync_api import sync_playwright
+from pathlib import Path
 from datetime import datetime
+from playwright.sync_api import sync_playwright
 import joblib
 import numpy as np
 from tensorflow.keras.models import load_model
+
+warnings.filterwarnings("ignore", category=UserWarning)
+
+# Paths
+log_path = Path("logs/prediction-log.json")
+log_path.parent.mkdir(exist_ok=True)
 
 # Load model and scaler
 model = load_model("bug_predictor_model.keras")
@@ -27,14 +32,12 @@ def run_bug_check(url, selector=None):
             page.wait_for_timeout(3000)
 
             headline_text = ""
-            if selector:
-                if page.locator(selector).count() > 0:
-                    headline_text = page.locator(selector).first.inner_text().strip()
-            else:
-                for fallback_selector in ["h1", ".titlelink", "header h1", "title"]:
-                    if page.locator(fallback_selector).count() > 0:
-                        headline_text = page.locator(fallback_selector).first.inner_text().strip()
-                        break
+            if selector and page.locator(selector).count() > 0:
+                headline_text = page.locator(selector).first.inner_text().strip()
+            elif page.locator("h1").count() > 0:
+                headline_text = page.locator("h1").first.inner_text().strip()
+            elif page.locator(".titlelink").count() > 0:
+                headline_text = page.locator(".titlelink").first.inner_text().strip()
 
             headline_length = len(headline_text)
             missing_elements = 0 if headline_text else 1
@@ -46,7 +49,6 @@ def run_bug_check(url, selector=None):
             load_time = (datetime.now() - start_time).total_seconds() * 1000
             browser.close()
 
-    # Make prediction
     inputs = scaler.transform([[headline_length, load_time, missing_elements]])
     prediction = model.predict(inputs)[0][0]
     result = {
@@ -59,10 +61,8 @@ def run_bug_check(url, selector=None):
         "result": "ran test"
     }
 
-    # Save to JSON log
-    log_path = "prediction-log.json"
     try:
-        if os.path.exists(log_path):
+        if log_path.exists():
             with open(log_path, "r") as f:
                 existing_logs = json.load(f)
         else:
@@ -82,6 +82,4 @@ if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Usage: python3 live_website_checker.py <URL> [optional selector]")
     else:
-        url = sys.argv[1]
-        selector = sys.argv[2] if len(sys.argv) > 2 else None
-        run_bug_check(url, selector)
+        run_bug_check(sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else None)
