@@ -4,15 +4,16 @@ import matplotlib.pyplot as plt
 import json
 import os
 import subprocess
+from urllib.parse import urlparse
 from datetime import datetime
 
 st.set_page_config(page_title="AI Bug Finder", layout="wide")
-st.title("🕷️ AI-Powered Bug Finder")
+st.title("🕷️ AI-Powered Bug Finder Dashboard")
 
-log_file_path = os.path.join(os.path.dirname(__file__), "prediction-log.json")
+log_path = os.path.join(os.path.dirname(__file__), "prediction-log.json")
 st.info("✅ Streamlit app loaded successfully.")
 
-# --- Utils ---
+# --- UTILS ---
 
 def load_logs(file_path):
     if os.path.exists(file_path):
@@ -22,6 +23,10 @@ def load_logs(file_path):
         except json.JSONDecodeError:
             return pd.DataFrame()
     return pd.DataFrame()
+
+def extract_domain(url):
+    parsed = urlparse(url)
+    return parsed.netloc
 
 def suggest_fix(entry):
     suggestions = []
@@ -35,10 +40,10 @@ def suggest_fix(entry):
         suggestions.append("✅ No obvious issues detected.")
     return suggestions
 
-# --- Tabs ---
+# === TABS ===
 tabs = st.tabs(["🌐 Live Website Test", "📊 Dashboard", "📁 Upload Logs"])
 
-# === TAB 1: Live Website Test ===
+# === TAB 1: LIVE TEST ===
 with tabs[0]:
     st.subheader("🌐 Live Website Test")
     url = st.text_input("Enter a URL to test", placeholder="https://example.com")
@@ -47,7 +52,7 @@ with tabs[0]:
         if not url:
             st.warning("Please enter a valid URL.")
         else:
-            with st.spinner("Running bug checker..."):
+            with st.spinner("Running test..."):
                 try:
                     result = subprocess.run(
                         ["python3", "live_website_checker.py", url],
@@ -55,85 +60,66 @@ with tabs[0]:
                         stderr=subprocess.PIPE,
                         text=True
                     )
+                    st.code(result.stdout)
+                    st.code(result.stderr)
 
-                    st.success("✅ Test complete!")
-                    st.code(result.stdout)  # Optional: show stdout
-                    # st.code(result.stderr)  # Optional: hide or show stderr
-
-                    if os.path.exists(log_file_path):
-                        with open(log_file_path, "r") as f:
+                    if os.path.exists(log_path):
+                        with open(log_path, "r") as f:
                             log_data = json.load(f)
+                        st.success("✅ Test complete!")
 
-                        if log_data:
-                            last = log_data[-1]
-                            st.subheader("🆕 Last Result")
-                            st.json(last)
+                        last_result = log_data[-1]
+                        st.subheader("🆕 Last Result")
+                        st.json(last_result)
 
-                            st.markdown("### 💡 Suggested Fixes")
-                            for fix in suggest_fix(last):
-                                st.markdown(f"- {fix}")
-                        else:
-                            st.warning("No results found in log.")
+                        st.markdown("### 💡 Suggested Fixes")
+                        for fix in suggest_fix(last_result):
+                            st.markdown(f"- {fix}")
                     else:
-                        st.error("❌ prediction-log.json not found.")
-
+                        st.warning("Log not found.")
                 except Exception as e:
-                    st.error(f"❌ Error running test: {e}")
+                    st.error(f"❌ Error: {e}")
 
-# === TAB 2: Dashboard ===
+# === TAB 2: DASHBOARD ===
 with tabs[1]:
-    st.header("📈 Bug Detection Insights")
+    st.header("📊 Bug Detection Dashboard")
 
     if st.button("🔁 Refresh Dashboard"):
         st.rerun()
 
-    df = load_logs(log_file_path)
-
+    df = load_logs(log_path)
     if df.empty:
         st.info("No logs available.")
     else:
-        df["timestamp"] = pd.to_datetime(df["timestamp"], format='mixed', errors='coerce')
+        df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
         df = df.dropna(subset=["timestamp"])
+        df["domain"] = df["url"].apply(extract_domain)
 
-        # Optional preview for debugging
-        st.markdown("#### 📄 Latest Entries")
-        st.dataframe(df.tail())
+        grouped = df.groupby("domain")
 
-        col1, col2 = st.columns(2)
+        selected_domain = st.selectbox("🔎 Select domain to view:", grouped.groups.keys())
+        domain_df = grouped.get_group(selected_domain)
 
-        with col1:
-            st.subheader("📉 Bug Likelihood Over Time")
-            plt.figure()
-            plt.plot(df["timestamp"], df["prediction"], marker="o")
-            plt.xticks(rotation=45)
-            plt.ylabel("Bug Likelihood")
-            plt.tight_layout()
-            st.pyplot(plt)
+        st.dataframe(domain_df[["timestamp", "url", "prediction", "loadTimeMs", "headlineLength"]].sort_values("timestamp", ascending=False))
 
-        with col2:
-            st.subheader("⏱️ Page Load Time Distribution")
-            plt.figure()
-            plt.hist(df["loadTimeMs"], bins=10, color="orange", edgecolor="black")
-            plt.xlabel("Load Time (ms)")
-            plt.ylabel("Frequency")
-            st.pyplot(plt)
-
-        st.subheader("✅ Test Outcome Summary")
-        outcome_counts = df["result"].value_counts()
+        st.subheader(f"📉 Bug Likelihood for {selected_domain}")
         plt.figure()
-        outcome_counts.plot(kind="bar", color=["green", "red"])
-        plt.ylabel("Number of Tests")
+        plt.plot(domain_df["timestamp"], domain_df["prediction"], marker="o")
+        plt.xticks(rotation=45)
+        plt.ylabel("Bug Likelihood")
         st.pyplot(plt)
 
-# === TAB 3: Upload Logs ===
+        st.subheader("⏱️ Load Time")
+        plt.figure()
+        plt.hist(domain_df["loadTimeMs"], bins=10, color="orange", edgecolor="black")
+        st.pyplot(plt)
+
+# === TAB 3: UPLOAD LOG FILE ===
 with tabs[2]:
-    st.header("📁 Upload New prediction-log.json")
+    st.header("📁 Upload prediction-log.json")
     uploaded_file = st.file_uploader("Upload your new prediction-log.json", type=["json"])
     if uploaded_file:
-        try:
-            new_data = json.load(uploaded_file)
-            with open(log_file_path, "w") as f:
-                json.dump(new_data, f, indent=2)
-            st.success("✅ Log file updated!")
-        except Exception as e:
-            st.error(f"❌ Failed to load uploaded JSON: {e}")
+        new_data = json.load(uploaded_file)
+        with open(log_path, "w") as f:
+            json.dump(new_data, f, indent=2)
+        st.success("✅ Log file updated!")
