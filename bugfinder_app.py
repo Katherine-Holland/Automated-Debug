@@ -42,7 +42,7 @@ df = load_logs(log_path)
 if not df.empty:
     df["timestamp"] = pd.to_datetime(df["timestamp"], format='mixed', errors='coerce')
     df = df.dropna(subset=["timestamp"])
-    df["shortUrl"] = df["url"].apply(lambda u: u.replace("https://", "").replace("http://", ""))
+    df["shortUrl"] = df["url"].apply(lambda u: u.replace("https://", "").replace("http://", "") if isinstance(u, str) else "")
 
 # Set up tabs
 tabs = st.tabs(["🌐 Live Website Test", "📊 Dashboard", "📁 Upload Logs"])
