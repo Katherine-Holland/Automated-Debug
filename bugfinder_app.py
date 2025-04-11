@@ -3,17 +3,14 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import json
 import os
-import subprocess
-from urllib.parse import urlparse
 from datetime import datetime
 
 st.set_page_config(page_title="AI Bug Finder", layout="wide")
 st.title("🕷️ AI-Powered Bug Finder Dashboard")
 
 log_path = os.path.join(os.path.dirname(__file__), "prediction-log.json")
-st.info("✅ Streamlit app loaded successfully.")
 
-# --- UTILS ---
+st.info("✅ Streamlit app loaded successfully.")
 
 def load_logs(file_path):
     if os.path.exists(file_path):
@@ -24,10 +21,6 @@ def load_logs(file_path):
             return pd.DataFrame()
     return pd.DataFrame()
 
-def extract_domain(url):
-    parsed = urlparse(url)
-    return parsed.netloc
-
 def suggest_fix(entry):
     suggestions = []
     if entry.get("missingElements", 0) == 1:
@@ -36,11 +29,22 @@ def suggest_fix(entry):
         suggestions.append("⏳ Optimize load performance.")
     if entry.get("headlineLength", 0) < 10:
         suggestions.append("🔤 Improve headline clarity.")
+    if entry.get("jsErrors"):
+        suggestions.append(f"❌ JavaScript errors detected: {len(entry['jsErrors'])}")
+    if entry.get("brokenResources"):
+        suggestions.append(f"🚫 Broken resources found: {len(entry['brokenResources'])}")
     if not suggestions:
         suggestions.append("✅ No obvious issues detected.")
     return suggestions
 
-# === TABS ===
+# Load the logs and preprocess
+df = load_logs(log_path)
+if not df.empty:
+    df["timestamp"] = pd.to_datetime(df["timestamp"], format='mixed', errors='coerce')
+    df = df.dropna(subset=["timestamp"])
+    df["shortUrl"] = df["url"].apply(lambda u: u.replace("https://", "").replace("http://", ""))
+
+# Set up tabs
 tabs = st.tabs(["🌐 Live Website Test", "📊 Dashboard", "📁 Upload Logs"])
 
 # === TAB 1: LIVE TEST ===
@@ -52,74 +56,87 @@ with tabs[0]:
         if not url:
             st.warning("Please enter a valid URL.")
         else:
-            with st.spinner("Running test..."):
-                try:
-                    result = subprocess.run(
-                        ["python3", "live_website_checker.py", url],
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE,
-                        text=True
-                    )
-                    st.code(result.stdout)
-                    st.code(result.stderr)
+            with st.spinner("Running bug test..."):
+                import subprocess
+                result = subprocess.run(
+                    ["python3", "live_website_checker.py", url],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True
+                )
+                st.code(result.stdout)
+                st.code(result.stderr)
 
-                    if os.path.exists(log_path):
-                        with open(log_path, "r") as f:
-                            log_data = json.load(f)
+                if os.path.exists(log_path):
+                    with open(log_path, "r") as f:
+                        logs = json.load(f)
+                    if logs:
+                        last_result = logs[-1]
                         st.success("✅ Test complete!")
-
-                        last_result = log_data[-1]
                         st.subheader("🆕 Last Result")
                         st.json(last_result)
 
                         st.markdown("### 💡 Suggested Fixes")
                         for fix in suggest_fix(last_result):
                             st.markdown(f"- {fix}")
-                    else:
-                        st.warning("Log not found.")
-                except Exception as e:
-                    st.error(f"❌ Error: {e}")
+                else:
+                    st.warning("⚠️ No prediction log file found.")
 
 # === TAB 2: DASHBOARD ===
 with tabs[1]:
-    st.header("📊 Bug Detection Dashboard")
+    st.header("📈 Bug Detection Insights")
 
-    if st.button("🔁 Refresh Dashboard"):
-        st.rerun()
-
-    df = load_logs(log_path)
     if df.empty:
-        st.info("No logs available.")
+        st.info("No logs found. Please run a live test.")
     else:
-        df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
-        df = df.dropna(subset=["timestamp"])
-        df["domain"] = df["url"].apply(extract_domain)
+        selected_domain = st.selectbox("Select a domain to explore", df["domain"].unique())
+        domain_df = df[df["domain"] == selected_domain].sort_values("timestamp")
 
-        grouped = df.groupby("domain")
+        st.subheader(f"🔍 Results for {selected_domain}")
 
-        selected_domain = st.selectbox("🔎 Select domain to view:", grouped.groups.keys())
-        domain_df = grouped.get_group(selected_domain)
+        # Summary Table
+        st.dataframe(
+            domain_df[["timestamp", "shortUrl", "prediction", "loadTimeMs", "missingElements"]],
+            use_container_width=True,
+        )
 
-        st.dataframe(domain_df[["timestamp", "url", "prediction", "loadTimeMs", "headlineLength"]].sort_values("timestamp", ascending=False))
+        # Drilldown
+        selected_row = st.selectbox(
+            "Click below to inspect details for a test entry",
+            domain_df["shortUrl"].tolist()
+        )
+        selected_entry = domain_df[domain_df["shortUrl"] == selected_row].iloc[-1].to_dict()
+        st.subheader("🔎 Detailed Debug Info")
+        st.json(selected_entry)
 
-        st.subheader(f"📉 Bug Likelihood for {selected_domain}")
+        st.markdown("### 📈 Bug Likelihood Over Time")
         plt.figure()
         plt.plot(domain_df["timestamp"], domain_df["prediction"], marker="o")
         plt.xticks(rotation=45)
         plt.ylabel("Bug Likelihood")
+        plt.tight_layout()
         st.pyplot(plt)
 
-        st.subheader("⏱️ Load Time")
+        st.markdown("### ⏱️ Load Time Distribution")
         plt.figure()
         plt.hist(domain_df["loadTimeMs"], bins=10, color="orange", edgecolor="black")
+        plt.xlabel("Load Time (ms)")
+        plt.ylabel("Frequency")
+        st.pyplot(plt)
+
+        st.markdown("### ✅ Test Outcome Summary")
+        outcome_counts = domain_df["result"].value_counts()
+        plt.figure()
+        outcome_counts.plot(kind="bar", color=["green", "red"])
+        plt.ylabel("Number of Tests")
         st.pyplot(plt)
 
 # === TAB 3: UPLOAD LOG FILE ===
 with tabs[2]:
-    st.header("📁 Upload prediction-log.json")
-    uploaded_file = st.file_uploader("Upload your new prediction-log.json", type=["json"])
+    st.header("📁 Upload a New prediction-log.json")
+    uploaded_file = st.file_uploader("Upload your JSON log file", type=["json"])
     if uploaded_file:
         new_data = json.load(uploaded_file)
         with open(log_path, "w") as f:
             json.dump(new_data, f, indent=2)
-        st.success("✅ Log file updated!")
+        st.success("✅ Log file replaced. Refresh the app to view.")
