@@ -1,18 +1,19 @@
 import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # Suppress TensorFlow logs
-
 import sys
 import json
 import warnings
-warnings.filterwarnings("ignore", category=UserWarning)
-
-from playwright.sync_api import sync_playwright
 from datetime import datetime
 import joblib
 import numpy as np
+from playwright.sync_api import sync_playwright
 from tensorflow.keras.models import load_model
 
-# Load model and scaler
+# --- Suppress logs and backend warnings ---
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # Suppress TensorFlow warnings
+warnings.filterwarnings("ignore", category=UserWarning)  # Suppress sklearn warning
+sys.stderr = open(os.devnull, 'w')  # Completely suppress stderr output (optional)
+
+# --- Load model and scaler ---
 model = load_model("bug_predictor_model.keras")
 scaler = joblib.load("bug_scaler.save")
 
@@ -27,13 +28,14 @@ def run_bug_check(url, selector=None):
             page.wait_for_timeout(3000)
 
             headline_text = ""
+
             if selector:
                 if page.locator(selector).count() > 0:
                     headline_text = page.locator(selector).first.inner_text().strip()
             else:
-                for sel in ["h1", ".titlelink", "header h1", "title"]:
-                    if page.locator(sel).count() > 0:
-                        headline_text = page.locator(sel).first.inner_text().strip()
+                for fallback_selector in ["h1", ".titlelink", "header h1", "title"]:
+                    if page.locator(fallback_selector).count() > 0:
+                        headline_text = page.locator(fallback_selector).first.inner_text().strip()
                         break
 
             headline_length = len(headline_text)
@@ -46,6 +48,7 @@ def run_bug_check(url, selector=None):
             load_time = (datetime.now() - start_time).total_seconds() * 1000
             browser.close()
 
+    # --- Predict using the ML model ---
     inputs = scaler.transform([[headline_length, load_time, missing_elements]])
     prediction = model.predict(inputs)[0][0]
     result = {
@@ -58,21 +61,21 @@ def run_bug_check(url, selector=None):
         "result": "ran test"
     }
 
+    # --- Log result to JSON ---
     log_path = "prediction-log.json"
     try:
-        logs = []
         if os.path.exists(log_path):
             with open(log_path, "r") as f:
-                try:
-                    logs = json.load(f)
-                except json.JSONDecodeError:
-                    logs = []
+                existing_logs = json.load(f)
+        else:
+            existing_logs = []
 
-        logs.append(result)
+        existing_logs.append(result)
 
         with open(log_path, "w") as f:
-            json.dump(logs, f, indent=2)
+            json.dump(existing_logs, f, indent=2)
 
+        # Debug output
         print(json.dumps(result, indent=2))
 
     except Exception as e:

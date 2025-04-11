@@ -7,10 +7,12 @@ import subprocess
 from datetime import datetime
 
 st.set_page_config(page_title="AI Bug Finder", layout="wide")
-st.title("🕷️ AI-Powered Bug Finder Dashboard")
+st.title("🕷️ AI-Powered Bug Finder")
 
-log_file_path = "prediction-log.json"
+log_file_path = os.path.join(os.path.dirname(__file__), "prediction-log.json")
 st.info("✅ Streamlit app loaded successfully.")
+
+# --- Utils ---
 
 def load_logs(file_path):
     if os.path.exists(file_path):
@@ -33,9 +35,10 @@ def suggest_fix(entry):
         suggestions.append("✅ No obvious issues detected.")
     return suggestions
 
+# --- Tabs ---
 tabs = st.tabs(["🌐 Live Website Test", "📊 Dashboard", "📁 Upload Logs"])
 
-# === TAB 1: LIVE CHECK ===
+# === TAB 1: Live Website Test ===
 with tabs[0]:
     st.subheader("🌐 Live Website Test")
     url = st.text_input("Enter a URL to test", placeholder="https://example.com")
@@ -44,7 +47,7 @@ with tabs[0]:
         if not url:
             st.warning("Please enter a valid URL.")
         else:
-            with st.spinner("Running test..."):
+            with st.spinner("Running bug checker..."):
                 try:
                     result = subprocess.run(
                         ["python3", "live_website_checker.py", url],
@@ -52,42 +55,52 @@ with tabs[0]:
                         stderr=subprocess.PIPE,
                         text=True
                     )
-                    st.code(result.stdout)
-                    st.code(result.stderr)
+
+                    st.success("✅ Test complete!")
+                    st.code(result.stdout)  # Optional: show stdout
+                    # st.code(result.stderr)  # Optional: hide or show stderr
 
                     if os.path.exists(log_file_path):
                         with open(log_file_path, "r") as f:
                             log_data = json.load(f)
 
-                        st.success("✅ Test complete!")
-
                         if log_data:
-                            last_result = log_data[-1]
+                            last = log_data[-1]
                             st.subheader("🆕 Last Result")
-                            st.json(last_result)
+                            st.json(last)
 
                             st.markdown("### 💡 Suggested Fixes")
-                            for fix in suggest_fix(last_result):
+                            for fix in suggest_fix(last):
                                 st.markdown(f"- {fix}")
+                        else:
+                            st.warning("No results found in log.")
                     else:
-                        st.warning("Log not found.")
-                except Exception as e:
-                    st.error(f"❌ Error: {e}")
+                        st.error("❌ prediction-log.json not found.")
 
-# === TAB 2: DASHBOARD ===
+                except Exception as e:
+                    st.error(f"❌ Error running test: {e}")
+
+# === TAB 2: Dashboard ===
 with tabs[1]:
     st.header("📈 Bug Detection Insights")
+
     if st.button("🔁 Refresh Dashboard"):
         st.rerun()
 
     df = load_logs(log_file_path)
+
     if df.empty:
         st.info("No logs available.")
     else:
         df["timestamp"] = pd.to_datetime(df["timestamp"], format='mixed', errors='coerce')
         df = df.dropna(subset=["timestamp"])
 
+        # Optional preview for debugging
+        st.markdown("#### 📄 Latest Entries")
+        st.dataframe(df.tail())
+
         col1, col2 = st.columns(2)
+
         with col1:
             st.subheader("📉 Bug Likelihood Over Time")
             plt.figure()
@@ -112,12 +125,15 @@ with tabs[1]:
         plt.ylabel("Number of Tests")
         st.pyplot(plt)
 
-# === TAB 3: UPLOAD ===
+# === TAB 3: Upload Logs ===
 with tabs[2]:
     st.header("📁 Upload New prediction-log.json")
     uploaded_file = st.file_uploader("Upload your new prediction-log.json", type=["json"])
     if uploaded_file:
-        new_data = json.load(uploaded_file)
-        with open(log_file_path, "w") as f:
-            json.dump(new_data, f, indent=2)
-        st.success("✅ Log file updated!")
+        try:
+            new_data = json.load(uploaded_file)
+            with open(log_file_path, "w") as f:
+                json.dump(new_data, f, indent=2)
+            st.success("✅ Log file updated!")
+        except Exception as e:
+            st.error(f"❌ Failed to load uploaded JSON: {e}")
