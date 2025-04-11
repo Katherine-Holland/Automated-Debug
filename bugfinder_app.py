@@ -1,116 +1,147 @@
-import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # Suppress TensorFlow logs
-
-import sys
+import streamlit as st
+import pandas as pd
+import matplotlib.pyplot as plt
 import json
-import warnings
-from urllib.parse import urlparse
+import os
 from datetime import datetime
 
-warnings.filterwarnings("ignore", category=UserWarning)
-sys.stderr = open(os.devnull, 'w')  # Mute stderr output
+st.set_page_config(page_title="AI Bug Finder", layout="wide")
+st.title("🕷️ AI-Powered Bug Finder Dashboard")
 
-import joblib
-import numpy as np
-from playwright.sync_api import sync_playwright
-from tensorflow.keras.models import load_model
+log_path = os.path.join(os.path.dirname(__file__), "prediction-log.json")
+st.info("✅ Streamlit app loaded successfully.")
 
-# Load model and scaler
-model = load_model("bug_predictor_model.keras")
-scaler = joblib.load("bug_scaler.save")
+# --- UTILS ---
 
-def extract_domain(url):
-    try:
-        parsed = urlparse(url)
-        return parsed.netloc.replace("www.", "")
-    except:
-        return "unknown"
-
-def run_bug_check(url, selector=None):
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        page = browser.new_page()
-        start_time = datetime.now()
-
-        js_errors = []
-        broken_resources = []
-
-        # Capture console errors
-        page.on("console", lambda msg: js_errors.append(msg.text) if msg.type == "error" else None)
-
-        # Capture failed requests
-        page.on("requestfailed", lambda request: broken_resources.append({
-            "url": request.url,
-            "error": request.failure
-        }))
-
+def load_logs(file_path):
+    if os.path.exists(file_path):
         try:
-            page.goto(url, timeout=10000)
-            page.wait_for_timeout(3000)
+            with open(file_path, "r") as f:
+                return pd.DataFrame(json.load(f))
+        except json.JSONDecodeError:
+            return pd.DataFrame()
+    return pd.DataFrame()
 
-            # Headline logic
-            headline_text = ""
-            if selector:
-                if page.locator(selector).count() > 0:
-                    headline_text = page.locator(selector).first.inner_text().strip()
-            else:
-                for fallback in ["h1", ".titlelink", "header h1", "title"]:
-                    if page.locator(fallback).count() > 0:
-                        headline_text = page.locator(fallback).first.inner_text().strip()
-                        break
+def suggest_fix(entry):
+    suggestions = []
+    if entry.get("missingElements", 0) == 1:
+        suggestions.append("🛠️ Consider adding a `<h1>` tag.")
+    if entry.get("loadTimeMs", 0) > 3000:
+        suggestions.append("⏳ Optimize load performance.")
+    if entry.get("headlineLength", 0) < 10:
+        suggestions.append("🔤 Improve headline clarity.")
+    if entry.get("jsErrors"):
+        suggestions.append(f"❌ JavaScript errors detected: {len(entry['jsErrors'])}")
+    if entry.get("brokenResources"):
+        suggestions.append(f"🚫 Broken resources found: {len(entry['brokenResources'])}")
+    if not suggestions:
+        suggestions.append("✅ No obvious issues detected.")
+    return suggestions
 
-            headline_length = len(headline_text)
-            missing_elements = 0 if headline_text else 1
+# --- LOAD & CLEAN DATA ---
+df = load_logs(log_path)
 
-        except Exception as e:
-            print(f"❌ Error loading {url}: {e}")
-            return
-        finally:
-            load_time = (datetime.now() - start_time).total_seconds() * 1000
-            browser.close()
+if not df.empty:
+    df["timestamp"] = pd.to_datetime(df["timestamp"], format='mixed', errors='coerce')
+    df = df.dropna(subset=["timestamp"])
 
-    # ML prediction
-    inputs = scaler.transform([[headline_length, load_time, missing_elements]])
-    prediction = model.predict(inputs)[0][0]
+    # Safely extract shortUrl and domain
+    df["shortUrl"] = df["url"].apply(lambda u: u.replace("https://", "").replace("http://", "") if isinstance(u, str) else "")
+    df["domain"] = df["url"].apply(lambda u: u.split("//")[-1].split("/")[0] if isinstance(u, str) else "")
 
-    # Compose result
-    result = {
-        "timestamp": datetime.utcnow().isoformat(),
-        "url": url,
-        "domain": extract_domain(url),
-        "selector": selector if selector else "Auto (h1/fallback)",
-        "headlineLength": headline_length,
-        "loadTimeMs": round(load_time),
-        "missingElements": missing_elements,
-        "jsErrors": js_errors,
-        "brokenResources": broken_resources,
-        "prediction": round(float(prediction), 4),
-        "result": "ran test"
-    }
+# --- TABS ---
+tabs = st.tabs(["🌐 Live Website Test", "📊 Dashboard", "📁 Upload Logs"])
 
-    # Save to prediction-log.json
-    log_path = "prediction-log.json"
-    try:
-        if os.path.exists(log_path):
-            with open(log_path, "r") as f:
-                existing_logs = json.load(f)
+# === TAB 1: LIVE TEST ===
+with tabs[0]:
+    st.subheader("🌐 Live Website Test")
+    url = st.text_input("Enter a URL to test", placeholder="https://example.com")
+
+    if st.button("Run Bug Check"):
+        if not url:
+            st.warning("Please enter a valid URL.")
         else:
-            existing_logs = []
+            with st.spinner("Running bug test..."):
+                import subprocess
+                result = subprocess.run(
+                    ["python3", "live_website_checker.py", url],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True
+                )
+                st.code(result.stdout)
+                st.code(result.stderr)
 
-        existing_logs.append(result)
-        with open(log_path, "w") as f:
-            json.dump(existing_logs, f, indent=2)
+                if os.path.exists(log_path):
+                    with open(log_path, "r") as f:
+                        logs = json.load(f)
+                    if logs:
+                        last_result = logs[-1]
+                        st.success("✅ Test complete!")
+                        st.subheader("🆕 Last Result")
+                        st.json(last_result)
 
-        # Print summary
-        print(json.dumps(result, indent=2))
+                        st.markdown("### 💡 Suggested Fixes")
+                        for fix in suggest_fix(last_result):
+                            st.markdown(f"- {fix}")
+                else:
+                    st.warning("⚠️ No prediction log file found.")
 
-    except Exception as e:
-        print(f"⚠️ Failed to log result: {e}")
+# === TAB 2: DASHBOARD ===
+with tabs[1]:
+    st.header("📈 Bug Detection Insights")
 
-if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python3 live_website_checker.py <URL> [optional selector]")
+    if df.empty:
+        st.info("No logs found. Please run a live test.")
     else:
-        url = sys.argv[1]
-        selector = sys.argv[2] if len(sys.argv) > 2 else None
-        run_bug_check(url, selector)
+        selected_domain = st.selectbox("Select a domain to explore", df["domain"].unique())
+        domain_df = df[df["domain"] == selected_domain].sort_values("timestamp")
+
+        st.subheader(f"🔍 Results for {selected_domain}")
+
+        # Summary Table
+        st.dataframe(
+            domain_df[["timestamp", "shortUrl", "prediction", "loadTimeMs", "missingElements"]],
+            use_container_width=True,
+        )
+
+        # Drilldown
+        selected_row = st.selectbox(
+            "Click below to inspect details for a test entry",
+            domain_df["shortUrl"].tolist()
+        )
+        selected_entry = domain_df[domain_df["shortUrl"] == selected_row].iloc[-1].to_dict()
+        st.subheader("🔎 Detailed Debug Info")
+        st.json(selected_entry)
+
+        st.markdown("### 📈 Bug Likelihood Over Time")
+        plt.figure()
+        plt.plot(domain_df["timestamp"], domain_df["prediction"], marker="o")
+        plt.xticks(rotation=45)
+        plt.ylabel("Bug Likelihood")
+        plt.tight_layout()
+        st.pyplot(plt)
+
+        st.markdown("### ⏱️ Load Time Distribution")
+        plt.figure()
+        plt.hist(domain_df["loadTimeMs"], bins=10, color="orange", edgecolor="black")
+        plt.xlabel("Load Time (ms)")
+        plt.ylabel("Frequency")
+        st.pyplot(plt)
+
+        st.markdown("### ✅ Test Outcome Summary")
+        outcome_counts = domain_df["result"].value_counts()
+        plt.figure()
+        outcome_counts.plot(kind="bar", color=["green", "red"])
+        plt.ylabel("Number of Tests")
+        st.pyplot(plt)
+
+# === TAB 3: UPLOAD ===
+with tabs[2]:
+    st.header("📁 Upload a New prediction-log.json")
+    uploaded_file = st.file_uploader("Upload your JSON log file", type=["json"])
+    if uploaded_file:
+        new_data = json.load(uploaded_file)
+        with open(log_path, "w") as f:
+            json.dump(new_data, f, indent=2)
+        st.success("✅ Log file replaced. Refresh the app to view.")
