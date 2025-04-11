@@ -7,15 +7,16 @@ import warnings
 from urllib.parse import urlparse
 from datetime import datetime
 
+# Suppress warnings and stderr spam (e.g., TensorFlow, Playwright, CUDA, etc.)
 warnings.filterwarnings("ignore", category=UserWarning)
-sys.stderr = open(os.devnull, 'w')  # Mute stderr output
+sys.stderr = open(os.devnull, 'w')
 
 import joblib
 import numpy as np
 from playwright.sync_api import sync_playwright
 from tensorflow.keras.models import load_model
 
-# Load model and scaler
+# Load the model and scaler
 model = load_model("bug_predictor_model.keras")
 scaler = joblib.load("bug_scaler.save")
 
@@ -38,7 +39,7 @@ def run_bug_check(url, selector=None):
         # Capture console errors
         page.on("console", lambda msg: js_errors.append(msg.text) if msg.type == "error" else None)
 
-        # Capture failed requests
+        # Capture failed network requests
         page.on("requestfailed", lambda request: broken_resources.append({
             "url": request.url,
             "error": request.failure
@@ -48,7 +49,6 @@ def run_bug_check(url, selector=None):
             page.goto(url, timeout=10000)
             page.wait_for_timeout(3000)
 
-            # Headline logic
             headline_text = ""
             if selector:
                 if page.locator(selector).count() > 0:
@@ -69,11 +69,11 @@ def run_bug_check(url, selector=None):
             load_time = (datetime.now() - start_time).total_seconds() * 1000
             browser.close()
 
-    # ML prediction
+    # Predict using ML model
     inputs = scaler.transform([[headline_length, load_time, missing_elements]])
     prediction = model.predict(inputs)[0][0]
 
-    # Compose result
+    # Compose the result
     result = {
         "timestamp": datetime.utcnow().isoformat(),
         "url": url,
@@ -88,7 +88,7 @@ def run_bug_check(url, selector=None):
         "result": "ran test"
     }
 
-    # Save to prediction-log.json
+    # Save result to JSON log
     log_path = "prediction-log.json"
     try:
         if os.path.exists(log_path):
@@ -101,7 +101,7 @@ def run_bug_check(url, selector=None):
         with open(log_path, "w") as f:
             json.dump(existing_logs, f, indent=2)
 
-        # Print summary
+        # Print result as output
         print(json.dumps(result, indent=2))
 
     except Exception as e:
