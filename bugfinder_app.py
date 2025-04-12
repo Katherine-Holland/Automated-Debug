@@ -126,10 +126,10 @@ with tabs[1]:
         st.pyplot(plt)
     
         with st.expander("⚙️ Admin Tools"):
-        if st.button("🧹 Clear All Logs (Reset Dashboard)"):
-            with open(log_path, "w") as f:
-                json.dump([], f, indent=2)
-            st.success("✅ Dashboard logs cleared! Click refresh to update.")
+            if st.button("🧹 Clear All Logs (Reset Dashboard)"):
+                with open(log_path, "w") as f:
+                    json.dump([], f, indent=2)
+                st.success("✅ Dashboard logs cleared! Click refresh to update.")
 
 # === TAB 3: Upload Logs ===
 with tabs[2]:
