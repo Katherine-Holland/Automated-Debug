@@ -124,6 +124,12 @@ with tabs[1]:
         outcome_counts.plot(kind="bar", color=["green", "red"])
         plt.ylabel("Number of Tests")
         st.pyplot(plt)
+    
+        with st.expander("⚙️ Admin Tools"):
+        if st.button("🧹 Clear All Logs (Reset Dashboard)"):
+            with open(log_path, "w") as f:
+                json.dump([], f, indent=2)
+            st.success("✅ Dashboard logs cleared! Click refresh to update.")
 
 # === TAB 3: Upload Logs ===
 with tabs[2]:
