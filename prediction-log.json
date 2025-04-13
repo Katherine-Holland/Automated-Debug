@@ -1,0 +1,46 @@
+[
+  {
+    "headlineLength": 32,
+    "loadTimeMs": 786,
+    "missingElements": 0,
+    "prediction": 1,
+    "result": "ran test",
+    "timestamp": "2025-04-08T20:43:57.268Z"
+  },
+  {
+    "timestamp": "2025-04-10T09:49:59.082733",
+    "url": "https://hackernews.com",
+    "headlineLength": 0,
+    "loadTimeMs": 3876,
+    "missingElements": 1,
+    "prediction": 0.8031,
+    "result": "ran test"
+  },
+  {
+    "timestamp": "2025-04-10T12:32:49.954165",
+    "url": "https://www.qawolf.com/task-wolf",
+    "headlineLength": 9,
+    "loadTimeMs": 3975,
+    "missingElements": 0,
+    "prediction": 0.8075,
+    "result": "ran test"
+  },
+  {
+    "timestamp": "2025-04-10T12:33:58.524607",
+    "url": "https://www.qawolf.com/how-it-works",
+    "headlineLength": 19,
+    "loadTimeMs": 4134,
+    "missingElements": 0,
+    "prediction": 0.813,
+    "result": "ran test"
+  },
+  {
+    "timestamp": "2025-04-10T14:25:41.338602",
+    "url": "https://news.ycombinator.com",
+    "headlineLength": 0,
+    "loadTimeMs": 3333,
+    "missingElements": 1,
+    "prediction": 0.7735,
+    "result": "ran test"
+  }
+]
